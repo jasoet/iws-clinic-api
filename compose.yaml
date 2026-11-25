@@ -1,0 +1,33 @@
+# Try the API locally against GMC's mock database: task up
+# Then: curl -H "Authorization: Bearer change-me-local" http://localhost:8080/api/v1/health
+services:
+  gmc-db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: gmc
+      POSTGRES_PASSWORD: change-me-local
+    volumes:
+      - ./database/gmc-example/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./database/gmc-example/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-d", "gmc"]
+      interval: 2s
+      retries: 30
+
+  api:
+    build: .
+    depends_on:
+      gmc-db:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      DB_CONNECTION: pgsql
+      DB_HOST: gmc-db
+      DB_PORT: "5432"
+      DB_DATABASE: gmc
+      DB_USERNAME: postgres
+      DB_PASSWORD: change-me-local
+      DB_SSLMODE: disable
+      DB_TIMEZONE: Asia/Jakarta
+      IWS_API_KEYS: change-me-local

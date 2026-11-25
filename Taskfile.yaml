@@ -48,6 +48,16 @@ tasks:
     cmds:
       - php artisan serve --port=8080
 
+  up:
+    desc: Run the API in a container against GMC's mock database on http://localhost:8080
+    cmds:
+      - "{{.COMPOSE_CMD}} up -d --build --wait"
+
+  down:
+    desc: Stop the local containers and drop their data
+    cmds:
+      - "{{.COMPOSE_CMD}} down -v"
+
   check:
     desc: "Check your queries against your real database (task check -- --from=2026-11-01 --to=2026-11-08)"
     cmds:
