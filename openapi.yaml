@@ -1,0 +1,395 @@
+openapi: 3.1.0
+info:
+  title: iws clinic API
+  version: 1.0.0
+  summary: Read-only API a clinic serves so iws can pull its medical check-up (MCU) data.
+  description: |
+    iws calls this API on a schedule and turns the records into FHIR R4 for the
+    hospital. The clinic only returns plain JSON from its own database.
+
+    Rules that hold for every endpoint:
+
+    - HTTPS only. Every call needs `Authorization: Bearer <key>`.
+    - Times are RFC 3339 with an offset (`2026-11-25T08:30:00+07:00`); dates are `YYYY-MM-DD`.
+    - An empty value is `null`, never `""`.
+    - Errors are `application/problem+json`.
+    - Every list is windowed on the visit's admission time, `[from, to)`.
+      iws asks for overlapping windows on purpose; the same record must keep the same key.
+    - Only medical check-up visits, and records belonging to them, are returned.
+servers:
+  - url: https://api.example.com/api/v1
+security:
+  - bearerAuth: []
+
+paths:
+  /health:
+    get:
+      summary: Is the API and its database up?
+      operationId: health
+      responses:
+        "200":
+          description: Up.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "503":
+          description: The database does not answer.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+
+  /patients:
+    get:
+      summary: Patients with a non-cancelled MCU visit in the window.
+      operationId: listPatients
+      parameters: &window
+        - { $ref: "#/components/parameters/from" }
+        - { $ref: "#/components/parameters/to" }
+        - { $ref: "#/components/parameters/limit" }
+        - { $ref: "#/components/parameters/cursor" }
+      responses:
+        "200":
+          description: One page.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: "#/components/schemas/Page" }
+                  - properties:
+                      data: { type: array, items: { $ref: "#/components/schemas/Patient" } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/WindowTooWide" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /visits:
+    get:
+      summary: Every MCU visit admitted in the window, cancelled ones included.
+      operationId: listVisits
+      parameters: *window
+      responses:
+        "200":
+          description: One page.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: "#/components/schemas/Page" }
+                  - properties:
+                      data: { type: array, items: { $ref: "#/components/schemas/Visit" } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/WindowTooWide" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /practitioners:
+    get:
+      summary: Clinicians who attended a non-cancelled MCU visit in the window.
+      operationId: listPractitioners
+      parameters: *window
+      responses:
+        "200":
+          description: One page.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: "#/components/schemas/Page" }
+                  - properties:
+                      data: { type: array, items: { $ref: "#/components/schemas/Practitioner" } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/WindowTooWide" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /locations:
+    get:
+      summary: The polis/clinics of non-cancelled MCU visits in the window.
+      operationId: listLocations
+      parameters: *window
+      responses:
+        "200":
+          description: One page.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: "#/components/schemas/Page" }
+                  - properties:
+                      data: { type: array, items: { $ref: "#/components/schemas/Location" } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/WindowTooWide" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /observations:
+    get:
+      summary: Vital signs and lab/exam results of non-cancelled MCU visits in the window.
+      operationId: listObservations
+      parameters: *window
+      responses:
+        "200":
+          description: One page.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: "#/components/schemas/Page" }
+                  - properties:
+                      data: { type: array, items: { $ref: "#/components/schemas/Observation" } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/WindowTooWide" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /conditions:
+    get:
+      summary: ICD-10 diagnoses of non-cancelled MCU visits in the window.
+      operationId: listConditions
+      parameters: *window
+      responses:
+        "200":
+          description: One page.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: "#/components/schemas/Page" }
+                  - properties:
+                      data: { type: array, items: { $ref: "#/components/schemas/Condition" } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/WindowTooWide" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /visits/presence:
+    post:
+      summary: Which of these visit keys does the clinic still hold?
+      description: |
+        No window and no status filter: a cancelled visit is present; only a
+        deleted visit is absent. If the query fails the whole request fails.
+      operationId: visitPresence
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [visit_keys]
+              properties:
+                visit_keys:
+                  type: array
+                  minItems: 1
+                  maxItems: 500
+                  items: { type: string }
+      responses:
+        "200":
+          description: Every key asked about, once, in present or absent.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [present, absent]
+                properties:
+                  present: { type: array, items: { type: string } }
+                  absent: { type: array, items: { type: string } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+
+  parameters:
+    from:
+      name: from
+      in: query
+      required: true
+      description: Window start, inclusive (RFC 3339). Matched against the visit's admission time.
+      schema: { type: string, examples: ["2026-11-01T00:00:00+07:00"] }
+    to:
+      name: to
+      in: query
+      required: true
+      description: Window end, exclusive (RFC 3339). At most 31 days after `from` by default.
+      schema: { type: string, examples: ["2026-11-08T00:00:00+07:00"] }
+    limit:
+      name: limit
+      in: query
+      description: Rows per page.
+      schema: { type: integer, minimum: 1, maximum: 1000, default: 500 }
+    cursor:
+      name: cursor
+      in: query
+      description: "`next_cursor` from the previous page. Send the same `from` and `to` with it."
+      schema: { type: string }
+
+  responses:
+    BadRequest:
+      description: A parameter or body is wrong.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Unauthorized:
+      description: Missing or wrong bearer key.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Forbidden:
+      description: The caller's IP is not on the allow-list.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    WindowTooWide:
+      description: The window is wider than the clinic allows.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    ServerError:
+      description: The query failed. The detail never carries SQL or data.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+
+  schemas:
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type: { type: string }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+
+    Health:
+      type: object
+      additionalProperties: false
+      required: [status, database, version, contract]
+      properties:
+        status: { type: string, enum: [ok, down] }
+        database: { type: string, enum: [ok, down] }
+        version: { type: string }
+        contract: { type: string, enum: [v1] }
+
+    Page:
+      type: object
+      required: [data, next_cursor, window, skipped]
+      properties:
+        data: { type: array }
+        next_cursor:
+          type: [string, "null"]
+          description: Pass as `cursor` for the next page; `null` on the last page.
+        window:
+          type: object
+          additionalProperties: false
+          required: [from, to]
+          properties:
+            from: { type: string, format: date-time }
+            to: { type: string, format: date-time }
+        skipped:
+          type: array
+          description: Rows on this page that broke the contract and were left out, with why.
+          items:
+            type: object
+            additionalProperties: false
+            required: [key, reason]
+            properties:
+              key: { type: [string, "null"] }
+              reason: { type: string }
+
+    Patient:
+      type: object
+      additionalProperties: false
+      required: [patient_key, name]
+      properties:
+        patient_key: { type: string, description: "Medical record number (no_rm). Never changes." }
+        nik: { type: [string, "null"], description: National identity number. }
+        name: { type: string }
+        gender: { type: [string, "null"], enum: [male, female, other, unknown, null] }
+        birth_date: { type: [string, "null"], format: date }
+        address: { type: [string, "null"] }
+        phone: { type: [string, "null"] }
+
+    Visit:
+      type: object
+      additionalProperties: false
+      required: [visit_key, patient_key, class, status, admitted_at]
+      properties:
+        visit_key: { type: string }
+        patient_key: { type: string }
+        practitioner_key: { type: [string, "null"] }
+        location_key: { type: [string, "null"] }
+        class: { type: string, enum: [ambulatory, emergency, inpatient] }
+        status: { type: string, enum: [in-progress, finished, cancelled] }
+        admitted_at: { type: string, format: date-time }
+        discharged_at: { type: [string, "null"], format: date-time }
+        diagnosis_keys:
+          type: array
+          items: { type: string }
+          description: condition_key of each diagnosis made at this visit; empty if none.
+
+    Practitioner:
+      type: object
+      additionalProperties: false
+      required: [practitioner_key, name]
+      properties:
+        practitioner_key: { type: string }
+        nik: { type: [string, "null"] }
+        name: { type: string }
+
+    Location:
+      type: object
+      additionalProperties: false
+      required: [location_key, name]
+      properties:
+        location_key: { type: string }
+        name: { type: string }
+
+    Observation:
+      type: object
+      additionalProperties: false
+      required: [observation_key, visit_key, patient_key, category, name, value, effective_at]
+      properties:
+        observation_key:
+          type: string
+          description: Unique across vital signs and results; prefix one when two tables share ids (e.g. "lab:123").
+        visit_key: { type: string }
+        patient_key: { type: string }
+        category: { type: string, enum: [vital-signs, laboratory, exam, procedure, social-history] }
+        name: { type: string, description: The test's name as the clinic writes it. }
+        loinc: { type: [string, "null"] }
+        local_code:
+          type: [string, "null"]
+          description: |
+            The clinic's own code. For vital-signs it must be one of heart_rate,
+            respiratory_rate, body_temperature, systolic_bp, diastolic_bp, spo2.
+        value: { type: string, description: 'As text: "5.4", "+", ">50".' }
+        unit: { type: [string, "null"] }
+        reference_range: { type: [string, "null"] }
+        flag: { type: [string, "null"], enum: [N, H, L, A, null] }
+        effective_at: { type: string, format: date-time, description: When it was taken or collected. }
+        issued_at: { type: [string, "null"], format: date-time, description: When the result came out. }
+
+    Condition:
+      type: object
+      additionalProperties: false
+      required: [condition_key, visit_key, patient_key, icd10, recorded_at]
+      properties:
+        condition_key: { type: string }
+        visit_key: { type: string }
+        patient_key: { type: string }
+        icd10: { type: string }
+        name: { type: [string, "null"] }
+        recorded_at: { type: string, format: date-time }
