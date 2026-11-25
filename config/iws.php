@@ -1,5 +1,13 @@
 <?php
 
+use App\Queries\ConditionQuery;
+use App\Queries\LocationQuery;
+use App\Queries\ObservationQuery;
+use App\Queries\PatientQuery;
+use App\Queries\PractitionerQuery;
+use App\Queries\PresenceQuery;
+use App\Queries\VisitQuery;
+
 /*
 | Settings for the API iws calls. Everything here comes from .env; you should
 | not need to edit this file. See README.md, "The rules".
@@ -22,7 +30,15 @@ return [
     'timezone' => env('DB_TIMEZONE', 'Asia/Jakarta'),
 
     // Which query class answers each record type. Edit the classes, not this map.
-    'queries' => [],
+    'queries' => [
+        'patients' => PatientQuery::class,
+        'visits' => VisitQuery::class,
+        'practitioners' => PractitionerQuery::class,
+        'locations' => LocationQuery::class,
+        'observations' => ObservationQuery::class,
+        'conditions' => ConditionQuery::class,
+        'presence' => PresenceQuery::class,
+    ],
 
     'version' => '1.0.0',
     'contract' => 'v1',
