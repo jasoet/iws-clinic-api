@@ -31,4 +31,4 @@ it('reports a bad date', fn () => expect((new RowValidator)->validate('patients'
 
 it('reports an unknown vital sign code', fn () => expect((new RowValidator)->validate('observations',
     ['category' => 'vital-signs', 'local_code' => 'nadi'] + $valid['observations']))
-    ->toBe(["local_code 'nadi' is not one of heart_rate, respiratory_rate, body_temperature, systolic_bp, diastolic_bp, spo2 (required for vital-signs)"]));
+    ->toBe(["local_code 'nadi' is not one of heart_rate, respiratory_rate, body_temperature, systolic_bp, diastolic_bp, spo2 (required for vital-signs without a LOINC code)"]));

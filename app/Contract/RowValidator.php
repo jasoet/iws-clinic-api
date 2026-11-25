@@ -26,9 +26,9 @@ final class RowValidator
             }
         }
 
-        if ($type === 'observations' && ($row['category'] ?? null) === 'vital-signs'
+        if ($type === 'observations' && ($row['category'] ?? null) === 'vital-signs' && ($row['loinc'] ?? null) === null
             && ! in_array($row['local_code'] ?? null, Types::VITAL_CODES, true)) {
-            $reasons[] = sprintf("local_code '%s' is not one of %s (required for vital-signs)",
+            $reasons[] = sprintf("local_code '%s' is not one of %s (required for vital-signs without a LOINC code)",
                 $row['local_code'] ?? '', implode(', ', Types::VITAL_CODES));
         }
 

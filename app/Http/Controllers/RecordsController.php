@@ -12,6 +12,7 @@ use App\Support\Window;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /** GET /api/v1/{type}: one page of one record type inside a window. */
 final class RecordsController
@@ -34,15 +35,23 @@ final class RecordsController
 
         $data = [];
         $skipped = [];
+        if ($after === null && ($nulls = $this->pager->nullKeys($query->sql(), $key, $window->params())) > 0) {
+            $skipped[] = ['key' => null, 'reason' => Pager::nullKeysReason($nulls, $key)];
+            Log::warning('iws: rows without a key', ['type' => $type, 'count' => $nulls]);
+        }
         foreach ($page['rows'] as $raw) {
-            $row = $normalizer->normalize($type, $query->transform($raw));
-            $reasons = $this->validator->validate($type, $row);
+            try {
+                $row = $normalizer->normalize($type, $query->transform($raw));
+                $reasons = $this->validator->validate($type, $row);
+            } catch (Throwable $e) {
+                $reasons = ['transform failed: '.$e->getMessage()];
+            }
             if ($reasons === []) {
                 $data[] = $row;
 
                 continue;
             }
-            $skip = ['key' => isset($raw[$key]) ? (string) $raw[$key] : null, 'reason' => implode('; ', $reasons)];
+            $skip = ['key' => isset($raw[$key]) ? trim((string) $raw[$key]) : null, 'reason' => implode('; ', $reasons)];
             $skipped[] = $skip;
             // Type, key and reason only: never the row's data.
             Log::warning('iws: skipped an invalid row', ['type' => $type] + $skip);

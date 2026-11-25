@@ -117,20 +117,32 @@ final class IwsCheck extends Command
         $seen = [];
         $duplicates = [];
         foreach ($rows as $raw) {
-            $row = $normalizer->normalize($type, $query->transform($raw));
-            $rowKey = (string) ($raw[$key] ?? '');
+            $rowKey = trim((string) ($raw[$key] ?? ''));
             if (isset($seen[$rowKey])) {
                 $duplicates[$rowKey] = true;
             }
             $seen[$rowKey] = true;
-            $reasons = $validator->validate($type, $row);
+            try {
+                $reasons = $validator->validate($type, $normalizer->normalize($type, $query->transform($raw)));
+            } catch (Throwable $e) {
+                $reasons = ['transform failed: '.$e->getMessage()];
+            }
             if ($reasons !== []) {
                 $invalid[] = "key $rowKey: ".implode('; ', $reasons);
             }
         }
 
+        try {
+            $nulls = $pager->nullKeys($query->sql(), $key, $window->params());
+        } catch (Throwable $e) {
+            $nulls = 0;
+        }
+        if ($nulls > 0) {
+            $this->error("$type: ".Pager::nullKeysReason($nulls, $key));
+        }
+
         $count = count($rows);
-        if ($invalid === [] && $duplicates === []) {
+        if ($invalid === [] && $duplicates === [] && $nulls === 0) {
             $this->info("$type: $count rows, OK");
 
             return ['ok' => true, 'keys' => array_keys($seen)];
@@ -155,7 +167,7 @@ final class IwsCheck extends Command
     {
         try {
             [$sql, $bindings] = SqlBinder::compile($queries->for('presence')->sql(), ['visit_keys' => $keys]);
-            $found = array_map(fn ($r) => (string) ((array) $r)['visit_key'], DB::select($sql, $bindings));
+            $found = array_map(fn ($r) => trim((string) ((array) $r)['visit_key']), DB::select($sql, $bindings));
         } catch (Throwable $e) {
             $this->error('presence: query failed: '.$this->reason($e));
 

@@ -300,7 +300,9 @@ components:
             to: { type: string, format: date-time }
         skipped:
           type: array
-          description: Rows on this page that broke the contract and were left out, with why.
+          description: |
+            Rows on this page that broke the contract and were left out, with why.
+            On the first page it also counts rows that have no key (key null).
           items:
             type: object
             additionalProperties: false
@@ -373,8 +375,9 @@ components:
         local_code:
           type: [string, "null"]
           description: |
-            The clinic's own code. For vital-signs it must be one of heart_rate,
-            respiratory_rate, body_temperature, systolic_bp, diastolic_bp, spo2.
+            The clinic's own code. For a vital-signs row without a LOINC code it
+            must be one of heart_rate, respiratory_rate, body_temperature,
+            systolic_bp, diastolic_bp, spo2.
         value: { type: string, description: 'As text: "5.4", "+", ">50".' }
         unit: { type: [string, "null"] }
         reference_range: { type: [string, "null"] }

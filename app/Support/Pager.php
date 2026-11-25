@@ -21,9 +21,11 @@ final class Pager
         $key = 'q.'.$keyColumn; // from Types, never from the request
         $inner = rtrim(preg_replace('/;\s*(--[^\n]*)?\s*$/', '', trim($sql)));
 
-        $wrapped = "SELECT * FROM (\n$inner\n) q";
+        // A row without a key can't be paged past, so it is left out here and
+        // counted by nullKeys() instead.
+        $wrapped = "SELECT * FROM (\n$inner\n) q WHERE $key IS NOT NULL";
         if ($afterKey !== null) {
-            $wrapped .= " WHERE $key > :iws_after";
+            $wrapped .= " AND $key > :iws_after";
             $params['iws_after'] = $afterKey;
         }
         $n = $limit + 1;
@@ -39,5 +41,21 @@ final class Pager
         $last = $rows === [] ? null : (string) end($rows)[$keyColumn];
 
         return ['rows' => $rows, 'lastKey' => $last, 'hasMore' => $hasMore];
+    }
+
+    /** How many rows of the query have no key (and so are never paged). */
+    public function nullKeys(string $sql, string $keyColumn, array $params, ?string $connection = null): int
+    {
+        $inner = rtrim(preg_replace('/;\s*(--[^\n]*)?\s*$/', '', trim($sql)));
+        [$compiled, $bindings] = SqlBinder::compile("SELECT COUNT(*) AS n FROM (\n$inner\n) q WHERE q.$keyColumn IS NULL", $params);
+
+        return (int) ((array) DB::connection($connection)->selectOne($compiled, $bindings))['n'];
+    }
+
+    public static function nullKeysReason(int $count, string $keyColumn): string
+    {
+        return $count === 1
+            ? "1 row has no $keyColumn and was left out"
+            : "$count rows have no $keyColumn and were left out";
     }
 }

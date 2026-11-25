@@ -221,13 +221,13 @@ One row per measured value: one per vital sign, one per lab parameter.
 
 | Field | | Notes |
 |---|---|---|
-| `observation_key` | ● | unique across vital signs **and** results. If they come from two tables whose ids can clash, prefix one (`'lab:' \|\| id`). |
+| `observation_key` | ● | never empty; unique across vital signs **and** results. If they come from two tables whose ids can clash, prefix one (`'lab:' \|\| id`). |
 | `visit_key` | ● | |
 | `patient_key` | ● | |
 | `category` | ● | `vital-signs`, `laboratory`, `exam`, `procedure` or `social-history` |
 | `name` | ● | the test's name as you write it ("Glukosa Puasa") |
 | `loinc` | | the LOINC code, if you have it |
-| `local_code` | | your own code. **For vital signs it must be one of:** `heart_rate`, `respiratory_rate`, `body_temperature`, `systolic_bp`, `diastolic_bp`, `spo2` |
+| `local_code` | | your own code. **For a vital sign without a LOINC code it must be one of:** `heart_rate`, `respiratory_rate`, `body_temperature`, `systolic_bp`, `diastolic_bp`, `spo2` |
 | `value` | ● | as text: `"5.4"`, `"+"`, `">50"`, `"Normal"` |
 | `unit` | | |
 | `reference_range` | | as text: `"70-100"` |
@@ -403,8 +403,20 @@ dialect; the template adapts the paging. Cast keys to text and use
 splits longer periods itself.
 
 **What if a row is wrong?** It's skipped and listed in `skipped` with the
-reason, and a warning goes to your log. The others still arrive. `task check`
-shows the same reasons.
+reason, and a warning goes to your log. The others still arrive. The same
+happens to a row whose `transform()` throws, and rows whose key is `NULL` are
+counted in `skipped` on the first page. `task check` shows the same reasons.
+
+**Our key column is `char(n)` and padded with spaces.** That's fine: the API
+trims keys, in the lists and in presence.
+
+**SQL the template can't read.** The placeholder scanner understands normal
+`'…'` strings, `"…"` names, `--` and `/* */` comments and PostgreSQL `::`
+casts. It does not understand PostgreSQL `$$…$$` or `E'…'` strings, MySQL
+backslash escapes (`'it\'s'`) or the PostgreSQL JSON `?` operator; write
+those differently. On SQL Server your query is wrapped in a subquery, so it
+can't start with `WITH` (move the CTE into a subquery) and its column names
+must be unique. `task check` fails loudly on all of these.
 
 **Does iws ever write to our database?** No. The API has no endpoint that
 writes, and its database login should only be able to `SELECT`.

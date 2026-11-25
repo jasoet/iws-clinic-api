@@ -25,7 +25,7 @@ final class PresenceController
         $keys = $this->keys($request->json('visit_keys'));
 
         [$sql, $bindings] = SqlBinder::compile($this->queries->for('presence')->sql(), ['visit_keys' => $keys]);
-        $found = array_map(fn ($row) => (string) ((array) $row)['visit_key'], DB::select($sql, $bindings));
+        $found = array_map(fn ($row) => trim((string) ((array) $row)['visit_key']), DB::select($sql, $bindings));
 
         $present = array_values(array_intersect($keys, $found));
         $absent = array_values(array_diff($keys, $found));
