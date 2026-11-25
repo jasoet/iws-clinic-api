@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>{title}</title>
+  <link rel="stylesheet" href="print.css">
+</head>
+<body>
+
+  <!-- Cover -->
+  <section class="cover">
+    <div class="cover-kicker">IWS &middot; CLINIC API &middot; READ-ONLY</div>
+    <div class="cover-emblem">
+      <div class="em-db"><span></span><span></span><span></span></div>
+      <div class="em-link"></div>
+      <div class="em-api">{ }</div>
+      <div class="em-link"></div>
+      <div class="em-hub"></div>
+    </div>
+    <h1>{title}</h1>
+    <div class="cover-rule"></div>
+    <div class="codename">{codename}</div>
+    <div class="subtitle">{subtitle}</div>
+    <div class="meta">
+      <p>{version}</p>
+      <p>{footer}</p>
+    </div>
+  </section>
+
+  <!-- Table of Contents -->
+  <section class="toc">
+    <h2>Table of Contents</h2>
+    <ol>
+{toc_items}
+    </ol>
+  </section>
+
+  <!-- Chapters -->
+{chapters}
+
+  <script>
+    // Tag body for preview-only chrome (shadows, gray desk background).
+    // build.py strips this class before rendering the PDF so the printed
+    // book stays clean.
+    document.body.classList.add('preview-mode');
+
+    // Paged.js fires this once pagination is complete. Exposing a window
+    // flag lets the PDF renderer wait deterministically (more reliable than
+    // polling for DOM classes in headless Chrome).
+    window.PagedConfig = {
+      after: () => { window.__pagedjsDone = true; },
+    };
+  </script>
+  <script src="paged.polyfill.js"></script>
+</body>
+</html>

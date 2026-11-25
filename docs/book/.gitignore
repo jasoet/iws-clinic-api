@@ -1,0 +1,17 @@
+# uv-managed virtual environment
+.venv/
+
+# Build output (regenerate with `uv run python build.py`)
+dist/
+
+# Editor / OS noise
+.DS_Store
+*.swp
+__pycache__/
+
+# Keep these committed:
+#   pyproject.toml   — declares dependencies
+#   uv.lock          — pinned versions for reproducible builds
+#   print/           — CSS + paged.js
+#   docs/            — markdown source + drawio sources + rendered PNGs
+#   build.py         — build script

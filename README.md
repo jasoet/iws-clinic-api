@@ -31,7 +31,7 @@ Contents:
 8. [Questions](#8-questions)
 
 The exact contract is in [`openapi.yaml`](openapi.yaml) (OpenAPI 3.1). This
-guide says the same thing in plain words.
+guide says the same thing in plain words. `task guide:pdf` builds this guide as a PDF.
 
 ---
 

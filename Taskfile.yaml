@@ -58,6 +58,13 @@ tasks:
     cmds:
       - "{{.COMPOSE_CMD}} down -v"
 
+  guide:pdf:
+    desc: Build the guide as a PDF from README.md (docs/book/dist/iws-clinic-api-guide.pdf; needs uv and Chrome)
+    dir: docs/book
+    cmds:
+      - uv sync -q
+      - uv run python build.py
+
   check:
     desc: "Check your queries against your real database (task check -- --from=2026-11-01 --to=2026-11-08)"
     cmds:
