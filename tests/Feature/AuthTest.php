@@ -46,3 +46,23 @@ it('answers unknown paths with problem json', function () {
         ->assertHeader('Content-Type', 'application/problem+json')
         ->assertJsonPath('status', 404);
 });
+
+it('sees the real client IP behind a trusted proxy', function () {
+    putenv('TRUSTED_PROXIES=10.9.9.9');
+    $this->refreshApplication();
+    putenv('TRUSTED_PROXIES');
+
+    $headers = withKey() + ['X-Forwarded-For' => '10.0.0.1'];
+    config(['iws.allowed_ips' => ['10.0.0.1']]);
+    $this->withServerVariables(['REMOTE_ADDR' => '10.9.9.9'])
+        ->getJson('/api/v1/health', $headers)
+        ->assertOk();
+});
+
+it('ignores X-Forwarded-For from an untrusted address', function () {
+    $headers = withKey() + ['X-Forwarded-For' => '10.0.0.1'];
+    config(['iws.allowed_ips' => ['10.0.0.1']]);
+    $this->withServerVariables(['REMOTE_ADDR' => '10.9.9.9'])
+        ->getJson('/api/v1/health', $headers)
+        ->assertStatus(403);
+});

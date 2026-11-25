@@ -1,0 +1,54 @@
+version: "3"
+
+vars:
+  CONTAINER_CMD:
+    sh: "if docker info >/dev/null 2>&1; then echo docker; elif podman info >/dev/null 2>&1; then echo podman; else echo false; fi"
+  COMPOSE_CMD:
+    sh: "if docker info >/dev/null 2>&1; then echo 'docker compose'; elif podman info >/dev/null 2>&1; then echo 'podman compose'; else echo false; fi"
+  GMC_TEST_CONTAINER: iws-clinic-api-gmc-test
+
+tasks:
+  default:
+    cmds:
+      - task --list
+
+  install:
+    desc: Install PHP dependencies and create .env from .env.example
+    cmds:
+      - composer install
+      - php -r "file_exists('.env') || copy('.env.example', '.env');"
+      - php artisan key:generate
+
+  test:
+    desc: Run the framework tests (SQLite in memory, no database needed)
+    cmds:
+      - ./vendor/bin/pest {{.CLI_ARGS}}
+
+  test:gmc:
+    desc: Test the GMC queries in app/Queries against a throwaway PostgreSQL container
+    cmds:
+      - "{{.CONTAINER_CMD}} rm -f {{.GMC_TEST_CONTAINER}} >/dev/null 2>&1 || true"
+      - "{{.CONTAINER_CMD}} run -d --name {{.GMC_TEST_CONTAINER}} -e POSTGRES_PASSWORD=gmc-test -e POSTGRES_DB=gmc -p 55432:5432 postgres:17-alpine >/dev/null"
+      - defer: "{{.CONTAINER_CMD}} rm -f {{.GMC_TEST_CONTAINER}} >/dev/null"
+      - "until {{.CONTAINER_CMD}} exec {{.GMC_TEST_CONTAINER}} pg_isready -h 127.0.0.1 -U postgres -d gmc >/dev/null 2>&1; do sleep 1; done"
+      - GMC_TEST_DB_HOST=127.0.0.1 GMC_TEST_DB_PORT=55432 GMC_TEST_DB_PASSWORD=gmc-test ./vendor/bin/pest --group=gmc {{.CLI_ARGS}}
+
+  lint:
+    desc: Check code style (Pint)
+    cmds:
+      - ./vendor/bin/pint --test
+
+  fmt:
+    desc: Fix code style (Pint)
+    cmds:
+      - ./vendor/bin/pint
+
+  serve:
+    desc: Run the API on http://localhost:8080 against the database in .env
+    cmds:
+      - php artisan serve --port=8080
+
+  check:
+    desc: "Check your queries against your real database (task check -- --from=2026-11-01 --to=2026-11-08)"
+    cmds:
+      - php artisan iws:check {{.CLI_ARGS}}
