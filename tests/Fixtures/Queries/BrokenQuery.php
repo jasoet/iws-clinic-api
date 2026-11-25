@@ -9,7 +9,7 @@ class BrokenQuery extends BaseQuery
     public function sql(): string
     {
         return <<<'SQL'
-SELECT nothing FROM no_such_table WHERE a >= :from AND a < :to
+SELECT a FROM no_such_table WHERE a >= :from AND a < :to
 SQL;
     }
 }
