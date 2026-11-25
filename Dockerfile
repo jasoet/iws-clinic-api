@@ -3,7 +3,7 @@
 #
 # This runs PHP's built-in server, which is fine behind a reverse proxy that
 # terminates HTTPS for one caller (iws). For more load, run it under php-fpm
-# + nginx instead (README.md, "Going live").
+# + nginx instead (README.md, bagian "7. Go-live").
 
 FROM composer:2 AS vendor
 WORKDIR /app

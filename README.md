@@ -1,71 +1,79 @@
 # iws clinic API
 
-This is a template for a small, **read-only** web API that your clinic runs so
-iws can collect your medical check-up (MCU) results and pass them on to the
-hospital.
+**Repo:** <https://github.com/jasoet/iws-clinic-api> (public, langsung `git clone` saja)
+
+Repo ini adalah template untuk web API kecil yang **read-only**. API ini
+dijalankan di sisi klinik, supaya iws bisa mengambil data medical check-up
+(MCU) lalu meneruskannya ke rumah sakit.
 
 ```
-your database  →  this API (you run it)  →  iws  →  hospital (RSA UGM)
+database klinik  →  API ini (dijalankan klinik)  →  iws  →  rumah sakit (RSA UGM)
 ```
 
-**What you do:** write the SQL that reads your own tables. Everything else is
-already built: sign-in with a key, paging, checking each row, the JSON format
-and error messages. You edit the files in `app/Queries/` and nothing else.
+**Bagian Anda:** menulis SQL untuk membaca tabel-tabel di database klinik.
+Sisanya sudah disiapkan: autentikasi dengan API key, paging, pengecekan
+tiap baris, format JSON, dan pesan error. Yang perlu diubah hanya file-file di
+`app/Queries/`.
 
-**What iws does:** it calls this API every few minutes, turns the records into
-FHIR R4 and delivers them. You don't need to know FHIR, LOINC rules or how iws
-works inside.
+**Bagian iws:** iws memanggil API ini setiap beberapa menit, mengubah datanya
+ke FHIR R4, lalu mengirimkannya ke rumah sakit. Anda tidak perlu paham FHIR,
+aturan LOINC, atau cara kerja iws di dalamnya.
 
-The template ships with **GMC's queries** already filled in, as a worked
-example. Replace them with yours.
+Query di template ini sudah berisi **query milik GMC** sebagai contoh nyata.
+Silakan ganti dengan query klinik Anda.
 
-Contents:
+Isi:
 
-1. [How iws uses the API](#1-how-iws-uses-the-api)
-2. [Quick start](#2-quick-start)
-3. [The rules](#3-the-rules)
-4. [The endpoints](#4-the-endpoints)
-5. [Mapping your values](#5-mapping-your-values)
-6. [Check and test](#6-check-and-test)
-7. [Going live](#7-going-live)
-8. [Questions](#8-questions)
+1. [Cara iws memakai API ini](#1-cara-iws-memakai-api-ini)
+2. [Mulai cepat](#2-mulai-cepat)
+3. [Aturan main](#3-aturan-main)
+4. [Endpoint](#4-endpoint)
+5. [Memetakan nilai](#5-memetakan-nilai)
+6. [Cek dan test](#6-cek-dan-test)
+7. [Go-live](#7-go-live)
+8. [Tanya jawab](#8-tanya-jawab)
 
-The exact contract is in [`openapi.yaml`](openapi.yaml) (OpenAPI 3.1). This
-guide says the same thing in plain words. `task guide:pdf` builds this guide as a PDF.
+Kontrak lengkapnya ada di [`openapi.yaml`](openapi.yaml) (OpenAPI 3.1). Panduan
+ini menjelaskan hal yang sama dengan bahasa sehari-hari. Versi PDF-nya bisa
+dibuat dengan `task guide:pdf`.
 
 ---
 
-## 1. How iws uses the API
+## 1. Cara iws memakai API ini
 
-- **It only reads.** iws never sends data to you.
-- **It asks by time window.** Each call says "give me everything for visits
-  admitted from `from` up to (not including) `to`". Every record type uses the
-  **visit's admission time**, even results that came out days later.
-- **It asks again on purpose.** Each run re-reads the last 7 days, so a result
-  that came out late is still picked up. iws recognises records it already has
-  by their **key**. So a record must keep the **same key forever**.
-- **Only MCU.** Return medical check-up visits and what belongs to them,
-  nothing else. Your SQL decides what counts as MCU (at GMC it's visits to the
-  poli named "Medical Check Up").
-- **Cancelled visits.** Return a cancelled visit from `visits` with
-  `status: "cancelled"`, so the hospital learns it was cancelled. Leave its
-  patient, results and diagnoses out of the other lists.
-- **Deleted visits.** Now and then iws asks "do you still have these visits?"
-  (the presence endpoint), to notice visits that were deleted.
+- **Hanya membaca.** iws tidak pernah mengirim data ke klinik.
+- **Diminta per rentang waktu.** Setiap request berbunyi kira-kira "kirim
+  semua data untuk kunjungan yang masuk sejak `from` sampai sebelum `to`".
+  Semua jenis data memakai **waktu masuk kunjungan**, termasuk hasil lab yang
+  baru keluar beberapa hari kemudian.
+- **Sengaja dibaca ulang.** Setiap kali jalan, iws membaca ulang 7 hari ke
+  belakang, jadi hasil lab yang telat keluar tetap terambil. iws mengenali data
+  yang sudah pernah diterima dari **key**-nya. Karena itu satu data harus
+  punya **key yang sama selamanya**.
+- **Hanya MCU.** Kirim kunjungan medical check-up beserta data turunannya,
+  tidak lebih. SQL Anda yang menentukan kunjungan mana yang termasuk MCU (di
+  GMC: kunjungan ke poli bernama "Medical Check Up").
+- **Kunjungan batal.** Kunjungan yang batal tetap dikirim lewat `visits`
+  dengan `status: "cancelled"`, supaya rumah sakit tahu kunjungan itu batal.
+  Pasien, hasil pemeriksaan, dan diagnosisnya jangan ikut dikirim di endpoint
+  lain.
+- **Kunjungan terhapus.** Sesekali iws bertanya "kunjungan-kunjungan ini masih
+  ada?" (endpoint presence), untuk tahu mana yang sudah dihapus.
 
-## 2. Quick start
+## 2. Mulai cepat
 
-You need PHP 8.4 or newer with the driver for your database (`pdo_pgsql`,
-`pdo_mysql` or `pdo_sqlsrv`), and Composer. [Task](https://taskfile.dev) is
-optional: every `task` command below is listed in `Taskfile.yaml` if you'd
-rather type it out.
+Yang dibutuhkan: PHP 8.4 ke atas dengan driver database Anda (`pdo_pgsql`,
+`pdo_mysql`, atau `pdo_sqlsrv`) dan Composer. [Task](https://taskfile.dev)
+boleh dipakai, boleh tidak; semua perintah `task` di bawah ada di
+`Taskfile.yaml` kalau mau diketik manual.
 
 ```sh
-git clone <this repo> clinic-api && cd clinic-api
-task install          # composer install, creates .env
+git clone https://github.com/jasoet/iws-clinic-api.git clinic-api
+cd clinic-api
+task install          # composer install, sekalian membuat .env
 ```
 
-**Try it first with GMC's example data** (needs Docker or Podman):
+**Coba dulu dengan data contoh GMC** (butuh Docker atau Podman):
 
 ```sh
 task up
@@ -76,99 +84,103 @@ curl -H "Authorization: Bearer change-me-local" \
 task down
 ```
 
-**Then point it at your database.** Edit `.env`:
+**Lalu arahkan ke database klinik.** Ubah `.env`:
 
 ```sh
-DB_CONNECTION=pgsql        # pgsql, mysql, mariadb or sqlsrv
+DB_CONNECTION=pgsql        # pgsql, mysql, mariadb, atau sqlsrv
 DB_HOST=127.0.0.1
 DB_PORT=5432
 DB_DATABASE=simrs
-DB_USERNAME=iws_reader     # a login that can only SELECT
+DB_USERNAME=iws_reader     # user yang hanya bisa SELECT
 DB_PASSWORD=...
-DB_TIMEZONE=Asia/Jakarta   # the zone your database writes times in
-IWS_API_KEYS=...           # see "Going live"
+DB_TIMEZONE=Asia/Jakarta   # zona waktu yang dipakai database saat menyimpan jam
+IWS_API_KEYS=...           # lihat bagian "Go-live"
 ```
 
-Rewrite the seven files in `app/Queries/` for your tables (section 4), then:
+Tulis ulang ketujuh file di `app/Queries/` sesuai tabel Anda (bagian 4),
+lalu jalankan:
 
 ```sh
-task check -- --from=2026-11-01 --to=2026-11-08   # checks your SQL against your data
-task serve                                        # runs the API on http://localhost:8080
+task check -- --from=2026-11-01 --to=2026-11-08   # cek SQL Anda terhadap data asli
+task serve                                        # jalankan API di http://localhost:8080
 ```
 
-## 3. The rules
+## 3. Aturan main
 
-| Rule | What it means |
+| Aturan | Artinya |
 |---|---|
-| **Key** | Every call sends `Authorization: Bearer <key>`. A missing or wrong key gets `401`. |
-| **HTTPS** | Always, in production. |
-| **Times** | Returned as RFC 3339 with the offset: `2026-11-25T08:30:00+07:00`. The template does this for you from `DB_TIMEZONE`. |
-| **Dates** | `YYYY-MM-DD` (birth date). Also done for you. |
-| **Empty** | An empty value is `null`. The template turns `''` into `null` and trims spaces. |
-| **Paging** | Up to 500 rows per page (iws may ask up to 1000). The template does the paging. Your SQL must **not** have `ORDER BY` or `LIMIT`. |
-| **Window size** | At most 31 days per call (`IWS_MAX_WINDOW_DAYS`). Wider gets `422`. |
-| **Errors** | Always JSON in the `application/problem+json` format, e.g. `{"type":"about:blank","title":"Bad Request","status":400,"detail":"'from' is required…"}`. A failed query returns `500` with no SQL or data in it; the full error goes to your log. |
-| **Bad rows** | A row that breaks the contract (say, a status the template doesn't know) is left out of `data` and listed under `skipped` with the reason. The rest of the page still arrives. |
+| **Key** | Setiap request membawa `Authorization: Bearer <key>`. Tanpa key atau key salah, jawabannya `401`. |
+| **HTTPS** | Wajib di production. |
+| **Waktu** | Dikirim dalam format RFC 3339 lengkap dengan offset: `2026-11-25T08:30:00+07:00`. Template yang mengurus ini berdasarkan `DB_TIMEZONE`. |
+| **Tanggal** | `YYYY-MM-DD` (tanggal lahir). Ini juga sudah diurus. |
+| **Kosong** | Nilai kosong dikirim sebagai `null`. Template mengubah `''` jadi `null` dan membuang spasi di ujung. |
+| **Paging** | Maksimal 500 baris per halaman (iws bisa minta sampai 1000). Paging diurus template. SQL Anda **jangan** pakai `ORDER BY` atau `LIMIT`. |
+| **Lebar window** | Paling lebar 31 hari per request (`IWS_MAX_WINDOW_DAYS`). Lebih dari itu dijawab `422`. |
+| **Error** | Selalu JSON dengan format `application/problem+json`, misalnya `{"type":"about:blank","title":"Bad Request","status":400,"detail":"'from' is required…"}`. Query yang gagal dijawab `500` tanpa SQL atau data di dalamnya; error lengkapnya masuk ke log Anda. |
+| **Baris bermasalah** | Baris yang melanggar kontrak (misalnya status yang tidak dikenal) tidak masuk ke `data`, tapi dicatat di `skipped` beserta alasannya. Baris lain di halaman itu tetap terkirim. |
 
-**A page looks like this:**
+**Satu halaman respons bentuknya seperti ini:**
 
 ```json
 {
-  "data": [ { …one record… }, … ],
+  "data": [ { …satu data… }, … ],
   "next_cursor": "eyJ0Ijoid…",
   "window": { "from": "2026-11-01T00:00:00+07:00", "to": "2026-12-01T00:00:00+07:00" },
   "skipped": [ { "key": "123", "reason": "status 'x' is not one of in-progress, finished, cancelled" } ]
 }
 ```
 
-iws calls again with `cursor=<next_cursor>` until `next_cursor` is `null`.
+iws akan request lagi dengan `cursor=<next_cursor>` sampai `next_cursor`
+bernilai `null`.
 
-## 4. The endpoints
+## 4. Endpoint
 
-All under `/api/v1`. The list endpoints take `from`, `to` (required), `limit`
-and `cursor`.
+Semua endpoint ada di bawah `/api/v1`. Endpoint list menerima `from`, `to`
+(wajib), `limit`, dan `cursor`.
 
-| Endpoint | Returns | Query file |
+| Endpoint | Isinya | File query |
 |---|---|---|
-| `GET /health` | is the API and database up | — |
-| `GET /patients` | patients with a non-cancelled MCU visit in the window | `PatientQuery.php` |
-| `GET /visits` | every MCU visit in the window, **including cancelled** | `VisitQuery.php` |
-| `GET /practitioners` | doctors who attended those (non-cancelled) visits | `PractitionerQuery.php` |
-| `GET /locations` | the poli/clinic of those visits | `LocationQuery.php` |
-| `GET /observations` | vital signs and lab/exam results of those visits | `ObservationQuery.php` |
-| `GET /conditions` | ICD-10 diagnoses of those visits | `ConditionQuery.php` |
-| `POST /visits/presence` | which visit keys you still have | `PresenceQuery.php` |
+| `GET /health` | API dan database hidup atau tidak | — |
+| `GET /patients` | pasien yang punya kunjungan MCU tidak batal di window itu | `PatientQuery.php` |
+| `GET /visits` | semua kunjungan MCU di window itu, **termasuk yang batal** | `VisitQuery.php` |
+| `GET /practitioners` | dokter yang menangani kunjungan (yang tidak batal) tersebut | `PractitionerQuery.php` |
+| `GET /locations` | poli/klinik tempat kunjungan tersebut | `LocationQuery.php` |
+| `GET /observations` | tanda vital dan hasil lab/pemeriksaan dari kunjungan tersebut | `ObservationQuery.php` |
+| `GET /conditions` | diagnosis ICD-10 dari kunjungan tersebut | `ConditionQuery.php` |
+| `POST /visits/presence` | key kunjungan mana yang masih ada | `PresenceQuery.php` |
 
-### How to write a query
+### Cara menulis query
 
-Each file in `app/Queries/` returns one SQL `SELECT`:
+Setiap file di `app/Queries/` mengembalikan satu `SELECT`:
 
-- **Name the columns exactly as the tables below** (`AS visit_key`, `AS name`, …).
-  Those names are the contract. Extra columns are ignored.
-- Use **`:from` and `:to`** for the window, on the visit's admission time:
-  `WHERE k.tanggal_masuk >= :from AND k.tanggal_masuk < :to`. You can use each
-  one as often as you need.
-- Return **one row per record**. For patients, doctors and locations, which
-  repeat across visits, use `GROUP BY` (see GMC's files).
-- No `ORDER BY` or `LIMIT`.
-- Keys are text. Cast numbers or UUIDs if you need to (`k.id::text` in
-  PostgreSQL, `CAST(k.id AS CHAR)` in MySQL, `CAST(k.id AS VARCHAR(50))` in SQL Server).
-- The comments marked **✎** in GMC's files show what's specific to GMC.
+- **Beri nama kolom persis seperti di tabel-tabel di bawah** (`AS visit_key`,
+  `AS name`, …). Nama-nama itu adalah kontraknya. Kolom tambahan diabaikan.
+- Pakai **`:from` dan `:to`** untuk window, terhadap waktu masuk kunjungan:
+  `WHERE k.tanggal_masuk >= :from AND k.tanggal_masuk < :to`. Masing-masing
+  boleh dipakai berkali-kali.
+- Satu baris untuk satu data. Pasien, dokter, dan lokasi bisa muncul di
+  banyak kunjungan, jadi pakai `GROUP BY` (lihat file-file GMC).
+- Tanpa `ORDER BY` dan `LIMIT`.
+- Key berupa text. Kalau kolomnya angka atau UUID, cast dulu (`k.id::text` di
+  PostgreSQL, `CAST(k.id AS CHAR)` di MySQL, `CAST(k.id AS VARCHAR(50))` di
+  SQL Server).
+- Komentar bertanda **✎** di file-file GMC menunjukkan bagian yang khusus
+  untuk GMC.
 
-If you need to fix up a value in PHP (split a field, look something up),
-override `transform(array $row): array` in that query class. Most clinics
-won't need it.
+Kalau ada nilai yang perlu dirapikan di PHP (memecah satu field, mencari ke
+tabel lain), override `transform(array $row): array` di class query tersebut.
+Sebagian besar klinik tidak akan butuh ini.
 
-Fields marked ● are required. The rest may be `null`.
+Field bertanda ● wajib diisi. Selebihnya boleh `null`.
 
 ### `GET /patients`
 
-| Field | | Notes |
+| Field | | Keterangan |
 |---|---|---|
-| `patient_key` | ● | your medical record number (no_rm). Never changes. |
-| `nik` | | national identity number |
+| `patient_key` | ● | nomor rekam medis (no_rm). Tidak boleh berubah. |
+| `nik` | | NIK |
 | `name` | ● | |
-| `gender` | | `male`, `female`, `other` or `unknown` |
+| `gender` | | `male`, `female`, `other`, atau `unknown` |
 | `birth_date` | | |
 | `address` | | |
 | `phone` | | |
@@ -180,17 +192,17 @@ Fields marked ● are required. The rest may be `null`.
 
 ### `GET /visits`
 
-| Field | | Notes |
+| Field | | Keterangan |
 |---|---|---|
 | `visit_key` | ● | |
-| `patient_key` | ● | same value as `patients.patient_key` |
-| `practitioner_key` | | same value as `practitioners.practitioner_key` |
-| `location_key` | | same value as `locations.location_key` |
-| `class` | ● | `ambulatory`, `emergency` or `inpatient` |
-| `status` | ● | `in-progress`, `finished` or `cancelled` |
+| `patient_key` | ● | sama dengan `patients.patient_key` |
+| `practitioner_key` | | sama dengan `practitioners.practitioner_key` |
+| `location_key` | | sama dengan `locations.location_key` |
+| `class` | ● | `ambulatory`, `emergency`, atau `inpatient` |
+| `status` | ● | `in-progress`, `finished`, atau `cancelled` |
 | `admitted_at` | ● | |
 | `discharged_at` | | |
-| `diagnosis_keys` | | the visit's `condition_key`s, comma-separated in SQL (`string_agg`, `GROUP_CONCAT`, `STRING_AGG`). The API sends a list. |
+| `diagnosis_keys` | | `condition_key` milik kunjungan ini, dipisah koma di SQL (`string_agg`, `GROUP_CONCAT`, `STRING_AGG`). API mengirimnya sebagai list. |
 
 ```json
 { "visit_key": "40000000-0000-0000-0000-000000000001", "patient_key": "RM-0001",
@@ -217,31 +229,33 @@ Fields marked ● are required. The rest may be `null`.
 
 ### `GET /observations`
 
-One row per measured value: one per vital sign, one per lab parameter.
+Satu baris untuk satu nilai yang diukur: satu per tanda vital, satu per
+parameter lab.
 
-| Field | | Notes |
+| Field | | Keterangan |
 |---|---|---|
-| `observation_key` | ● | never empty; unique across vital signs **and** results. If they come from two tables whose ids can clash, prefix one (`'lab:' \|\| id`). |
+| `observation_key` | ● | tidak boleh kosong, dan harus unik di antara tanda vital **dan** hasil lab. Kalau keduanya dari dua tabel yang id-nya bisa bentrok, beri prefix di salah satunya (`'lab:' \|\| id`). |
 | `visit_key` | ● | |
 | `patient_key` | ● | |
-| `category` | ● | `vital-signs`, `laboratory`, `exam`, `procedure` or `social-history` |
-| `name` | ● | the test's name as you write it ("Glukosa Puasa") |
-| `loinc` | | the LOINC code, if you have it |
-| `local_code` | | your own code. **For a vital sign without a LOINC code it must be one of:** `heart_rate`, `respiratory_rate`, `body_temperature`, `systolic_bp`, `diastolic_bp`, `spo2` |
-| `value` | ● | as text: `"5.4"`, `"+"`, `">50"`, `"Normal"` |
+| `category` | ● | `vital-signs`, `laboratory`, `exam`, `procedure`, atau `social-history` |
+| `name` | ● | nama pemeriksaan seperti yang ditulis di klinik ("Glukosa Puasa") |
+| `loinc` | | kode LOINC, kalau ada |
+| `local_code` | | kode internal klinik. **Untuk tanda vital yang tidak punya kode LOINC, isinya harus salah satu dari:** `heart_rate`, `respiratory_rate`, `body_temperature`, `systolic_bp`, `diastolic_bp`, `spo2` |
+| `value` | ● | dalam bentuk text: `"5.4"`, `"+"`, `">50"`, `"Normal"` |
 | `unit` | | |
-| `reference_range` | | as text: `"70-100"` |
-| `flag` | | `N` normal, `H` high, `L` low, `A` abnormal |
-| `effective_at` | ● | when it was measured or the sample was taken |
-| `issued_at` | | when the result came out (defaults to `effective_at`) |
+| `reference_range` | | dalam bentuk text: `"70-100"` |
+| `flag` | | `N` normal, `H` tinggi, `L` rendah, `A` abnormal |
+| `effective_at` | ● | waktu pengukuran atau pengambilan sampel |
+| `issued_at` | | waktu hasil keluar (kalau kosong, diisi `effective_at`) |
 
-**Vital signs:** you can leave `unit`, `reference_range` and `flag` as `NULL`.
-iws fills in the standard unit and works out high/low itself. You never need to
-supply clinical limits.
+**Tanda vital:** `unit`, `reference_range`, dan `flag` boleh dibiarkan
+`NULL`. iws yang mengisi satuan standarnya dan menentukan tinggi/rendahnya.
+Klinik tidak perlu menyediakan batas-batas klinis.
 
-**Codes:** if a result has no LOINC code, send your `local_code` (or just the
-name). iws shows unknown codes to the clinic staff to confirm once; records are
-never held back because of a missing code.
+**Kode:** kalau hasil lab tidak punya kode LOINC, kirim saja `local_code`
+(atau namanya). iws akan menampilkan kode yang belum dikenal ke staf klinik
+untuk dikonfirmasi sekali. Data tidak pernah ditahan gara-gara kodenya belum
+ada.
 
 ```json
 { "observation_key": "lab:70000000-0000-0000-0000-000000000001", "visit_key": "40000000-0000-0000-0000-000000000001",
@@ -257,36 +271,38 @@ never held back because of a missing code.
 | `condition_key` | ● | |
 | `visit_key` | ● | |
 | `patient_key` | ● | |
-| `icd10` | ● | leave out diagnoses with no ICD-10 code |
+| `icd10` | ● | diagnosis tanpa kode ICD-10 jangan dikirim |
 | `name` | | |
 | `recorded_at` | ● | |
 
 ### `POST /visits/presence`
 
-iws sends up to 500 keys:
+iws mengirim sampai 500 key:
 
 ```json
 { "visit_keys": ["40000000-0000-0000-0000-000000000003", "40000000-0000-0000-0000-000000000099"] }
 ```
 
-and gets back every key once:
+dan setiap key muncul tepat sekali di jawabannya:
 
 ```json
 { "present": ["40000000-0000-0000-0000-000000000003"], "absent": ["40000000-0000-0000-0000-000000000099"] }
 ```
 
-Your `PresenceQuery` uses `:visit_keys` (the template expands it into a list)
-and returns a `visit_key` column. **No window, no status filter, no MCU
-filter.** A cancelled visit is still present; only a deleted one is absent.
+`PresenceQuery` memakai `:visit_keys` (template yang memecahnya jadi list) dan
+mengembalikan kolom `visit_key`. **Tanpa window, tanpa filter status, tanpa
+filter MCU.** Kunjungan batal tetap dianggap ada; yang dianggap tidak ada
+hanya kunjungan yang sudah dihapus.
 
 ```sql
 SELECT k.kunjungan_id::text AS visit_key FROM kunjungan k WHERE k.kunjungan_id::text IN (:visit_keys)
 ```
 
-## 5. Mapping your values
+## 5. Memetakan nilai
 
-Your database uses its own words; the contract uses fixed English codes.
-Translate them with `CASE` in your SQL. GMC's mappings, as an example:
+Database klinik punya istilahnya sendiri, sedangkan kontrak memakai kode
+bahasa Inggris yang sudah baku. Terjemahkan dengan `CASE` di SQL. Contoh
+pemetaan dari GMC:
 
 ```sql
 CASE p.jenis_kelamin WHEN 'L' THEN 'male' WHEN 'P' THEN 'female' ELSE 'unknown' END AS gender,
@@ -305,13 +321,14 @@ CASE v.tipe WHEN 'nadi' THEN 'heart_rate' WHEN 'pernapasan' THEN 'respiratory_ra
 CASE UPPER(TRIM(hl.flag)) WHEN 'TINGGI' THEN 'H' WHEN 'RENDAH' THEN 'L' WHEN 'NORMAL' THEN 'N' … END AS flag
 ```
 
-Ending with `ELSE <the original value>` is deliberate: a value you didn't map
-shows up in `task check` with its real text, so you can see what to add.
+`ELSE <nilai aslinya>` di akhir itu disengaja: nilai yang terlewat dipetakan
+akan muncul apa adanya di `task check`, jadi kelihatan apa yang masih perlu
+ditambahkan.
 
-## 6. Check and test
+## 6. Cek dan test
 
-**`task check`** (`php artisan iws:check`) runs every query against your real
-database for a window and tells you what's wrong:
+**`task check`** (`php artisan iws:check`) menjalankan semua query terhadap
+database asli untuk satu window, lalu memberi tahu apa yang salah:
 
 ```
 $ task check -- --from=2026-11-01 --to=2026-12-01
@@ -326,22 +343,24 @@ presence: 4 of 4 visit keys found, OK
 All good. Tell iws your API is ready.
 ```
 
-It reports missing columns, values outside the lists, bad dates, duplicate
-keys and query errors (with your database's own error message), and warns
-about extra columns. Without `--from`/`--to` it checks the last 7 days;
-`--type=visits` checks one type. **Run it over a busy week before you tell iws
-you're ready.** It exits non-zero when something is wrong, so you can use it in
-your own CI.
+Yang dilaporkan: kolom yang kurang, nilai di luar daftar, tanggal yang tidak
+valid, key duplikat, key yang kosong, dan query yang error (lengkap dengan
+pesan error dari database Anda). Kolom tambahan hanya diberi peringatan.
+Tanpa `--from`/`--to`, yang dicek adalah 7 hari terakhir; `--type=visits`
+untuk mengecek satu jenis saja. **Jalankan di rentang seminggu yang ramai
+sebelum bilang ke iws bahwa API sudah siap.** Kalau ada masalah, exit code-nya
+bukan nol, jadi bisa dipasang di CI Anda sendiri.
 
-**`task test`** runs the template's own tests (no database needed). They test
-the fixed parts and keep passing whatever SQL you write. `task test:gmc` tests
-GMC's example queries against a throwaway PostgreSQL. Once you've replaced the
-queries with yours, that one no longer applies; delete `tests/Gmc` if you like.
+**`task test`** menjalankan test bawaan template (tidak perlu database). Test
+ini menguji bagian yang tetap dan akan tetap lolos apa pun SQL yang Anda
+tulis. `task test:gmc` menguji query contoh GMC terhadap PostgreSQL sementara.
+Setelah query diganti dengan milik Anda, test itu tidak relevan lagi; folder
+`tests/Gmc` boleh dihapus.
 
-## 7. Going live
+## 7. Go-live
 
-1. **A read-only database login.** Give the API a user that can only `SELECT`
-   the tables your queries read.
+1. **User database yang read-only.** Beri API ini user yang hanya bisa
+   `SELECT` ke tabel-tabel yang dibaca query Anda.
 
    ```sql
    -- PostgreSQL
@@ -354,69 +373,72 @@ queries with yours, that one no longer applies; delete `tests/Gmc` if you like.
    GRANT SELECT ON simrs.* TO 'iws_reader'@'%';
    ```
 
-2. **HTTPS.** Put the API behind your web server or load balancer with a
-   certificate. If it sits behind a proxy, put the proxy's address in
-   `TRUSTED_PROXIES` so the IP allow-list sees iws's real address.
+2. **HTTPS.** Pasang API di belakang web server atau load balancer yang punya
+   sertifikat. Kalau ada proxy di depannya, isi `TRUSTED_PROXIES` dengan
+   alamat proxy itu, supaya IP allow-list melihat IP asli iws.
 
-3. **A key for iws.** Generate a long random key:
+3. **Key untuk iws.** Buat key acak yang panjang:
 
    ```sh
    php -r "echo bin2hex(random_bytes(32)), PHP_EOL;"
    ```
 
-   Put it in `IWS_API_KEYS`. Send the **base URL by email** and the **key
-   through a separate secure channel** (never both in one message).
-   To change the key later, set both keys (`IWS_API_KEYS=new,old`), give iws
-   the new one, then remove the old one.
+   Simpan di `IWS_API_KEYS`. Kirim **base URL lewat email**, dan **key lewat
+   jalur aman yang terpisah** (jangan pernah dalam satu pesan).
+   Untuk ganti key nanti, isi dua key sekaligus (`IWS_API_KEYS=baru,lama`),
+   berikan yang baru ke iws, lalu hapus yang lama.
 
-4. **Optional: limit by IP.** Put iws's addresses in `IWS_ALLOWED_IPS`. Ask iws
-   for them.
+4. **Opsional: batasi IP.** Isi `IWS_ALLOWED_IPS` dengan IP iws. Minta
+   daftarnya ke tim iws.
 
-5. **Run it.**
-   - As a container: `docker build -t clinic-api .` (add
-     `--build-arg WITH_SQLSRV=1` for SQL Server) and run it with your `.env`
-     values as environment variables on port 8080.
-   - On a PHP server: deploy it like any Laravel app (php-fpm + nginx or
-     Apache, document root `public/`), with `APP_ENV=production` and
-     `APP_DEBUG=false`. Run `php artisan config:cache` after changing `.env`.
+5. **Jalankan.**
+   - Sebagai container: `docker build -t clinic-api .` (tambahkan
+     `--build-arg WITH_SQLSRV=1` untuk SQL Server), lalu jalankan dengan nilai
+     `.env` sebagai environment variable di port 8080.
+   - Di server PHP: deploy seperti aplikasi Laravel biasa (php-fpm + nginx
+     atau Apache, document root `public/`), dengan `APP_ENV=production` dan
+     `APP_DEBUG=false`. Jalankan `php artisan config:cache` setiap kali `.env`
+     diubah.
 
-6. **Run `task check` once more** on the server, then send iws the URL.
+6. **Jalankan `task check` sekali lagi** di server, baru kirim URL-nya ke iws.
 
-## 8. Questions
+## 8. Tanya jawab
 
-**A result changes after the visit window has passed. Does iws see it?**
-Yes, for 7 days: iws re-reads that far back each run. For corrections older
-than that, tell iws and they can re-read a period.
+**Hasil lab berubah setelah window kunjungannya lewat. Apakah iws tahu?**
+Ya, selama masih dalam 7 hari, karena iws selalu membaca ulang sejauh itu.
+Untuk koreksi yang lebih lama, kabari tim iws supaya periode itu dibaca ulang.
 
-**Which key should I use?** Your table's own primary key, as text. Never a row
-number or anything that can change. For patients use the medical record number.
+**Key apa yang sebaiknya dipakai?** Primary key tabel Anda sendiri, dalam
+bentuk text. Jangan nomor urut baris atau apa pun yang bisa berubah. Untuk
+pasien, pakai nomor rekam medis.
 
-**Our database stores times without a time zone.** Set `DB_TIMEZONE` to the
-zone the clinic writes them in (usually `Asia/Jakarta`). The template reads
-them in that zone and sends the right offset.
+**Database kami menyimpan jam tanpa zona waktu.** Isi `DB_TIMEZONE` dengan
+zona waktu klinik saat mencatat (biasanya `Asia/Jakarta`). Template akan
+membacanya di zona itu dan mengirim offset yang benar.
 
-**Our database is MySQL / SQL Server.** That works. Write the SQL in your
-dialect; the template adapts the paging. Cast keys to text and use
-`GROUP_CONCAT` / `STRING_AGG` for `diagnosis_keys`.
+**Database kami MySQL / SQL Server.** Bisa. Tulis SQL sesuai dialeknya;
+template yang menyesuaikan paging-nya. Cast key ke text, dan pakai
+`GROUP_CONCAT` / `STRING_AGG` untuk `diagnosis_keys`.
 
-**Can iws ask for a whole year at once?** No, 31 days at most per call. iws
-splits longer periods itself.
+**Bisakah iws minta data setahun sekaligus?** Tidak, maksimal 31 hari per
+request. iws sendiri yang memecah periode yang lebih panjang.
 
-**What if a row is wrong?** It's skipped and listed in `skipped` with the
-reason, and a warning goes to your log. The others still arrive. The same
-happens to a row whose `transform()` throws, and rows whose key is `NULL` are
-counted in `skipped` on the first page. `task check` shows the same reasons.
+**Kalau ada baris yang salah?** Baris itu dilewati dan dicatat di `skipped`
+beserta alasannya, dan peringatannya masuk ke log Anda. Baris lain tetap
+terkirim. Hal yang sama berlaku untuk baris yang membuat `transform()` error.
+Baris yang key-nya `NULL` dihitung di `skipped` pada halaman pertama.
+`task check` menampilkan alasan yang sama.
 
-**Our key column is `char(n)` and padded with spaces.** That's fine: the API
-trims keys, in the lists and in presence.
+**Kolom key kami bertipe `char(n)` dan berisi spasi di belakang.** Tidak
+masalah, API membuang spasi itu, baik di list maupun di presence.
 
-**SQL the template can't read.** The placeholder scanner understands normal
-`'…'` strings, `"…"` names, `--` and `/* */` comments and PostgreSQL `::`
-casts. It does not understand PostgreSQL `$$…$$` or `E'…'` strings, MySQL
-backslash escapes (`'it\'s'`) or the PostgreSQL JSON `?` operator; write
-those differently. On SQL Server your query is wrapped in a subquery, so it
-can't start with `WITH` (move the CTE into a subquery) and its column names
-must be unique. `task check` fails loudly on all of these.
+**SQL yang tidak bisa dibaca template.** Template mengenali string `'…'`
+biasa, nama `"…"`, komentar `--` dan `/* */`, serta cast `::` PostgreSQL.
+Yang belum dikenali: string PostgreSQL `$$…$$` atau `E'…'`, escape backslash
+MySQL (`'it\'s'`), dan operator JSON `?` PostgreSQL; tulis dengan cara lain.
+Di SQL Server, query Anda dibungkus sebagai subquery, jadi tidak bisa diawali
+`WITH` (pindahkan CTE-nya ke subquery) dan nama kolomnya harus unik. Semua
+kasus ini akan gagal dengan jelas di `task check`.
 
-**Does iws ever write to our database?** No. The API has no endpoint that
-writes, and its database login should only be able to `SELECT`.
+**Apakah iws pernah menulis ke database kami?** Tidak. API ini tidak punya
+endpoint untuk menulis, dan user database-nya seharusnya hanya bisa `SELECT`.

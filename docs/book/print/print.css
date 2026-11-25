@@ -70,7 +70,7 @@ body.preview-mode .pagedjs_page {
 
 /* Page-number badge above each sheet (preview only) */
 body.preview-mode .pagedjs_page::after {
-  content: "Page " counter(page) " / " counter(pages);
+  content: "Halaman " counter(page) " / " counter(pages);
   position: absolute;
   top: -24px;
   right: 0;

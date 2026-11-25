@@ -64,11 +64,11 @@ PRINT_DIR = BOOK_DIR / "print"
 DRAWIO_MACOS_APP = Path("/Applications/draw.io.app/Contents/MacOS/draw.io")
 
 # === EDIT THESE FOR YOUR BOOK ===
-BOOK_TITLE = "Clinic API Guide"
+BOOK_TITLE = "Panduan Clinic API"
 BOOK_CODENAME = "iws-clinic-api"
-BOOK_SUBTITLE = "Serve your medical check-up data to iws through a small, read-only REST API"
+BOOK_SUBTITLE = "Mengirim data medical check-up ke iws lewat REST API kecil yang read-only"
 BOOK_VERSION = "contract v1 · template 1.0.0"
-BOOK_FOOTER = "For clinic developers · GMC UGM · Korpagama"
+BOOK_FOOTER = "github.com/jasoet/iws-clinic-api"
 PDF_FILENAME = "iws-clinic-api-guide.pdf"
 
 # Chapters in nav order: (markdown filename, display title). Filled by split_readme().
@@ -79,7 +79,7 @@ def split_readme() -> None:
     """Cut README.md into chapters: the intro, then one per '## N. Title' section."""
     text = README.read_text(encoding="utf-8")
     # The README's own contents list links to GitHub anchors; the book has its own TOC.
-    text = re.sub(r"\nContents:\n\n(?:\d+\. .*\n)+", "\n", text)
+    text = re.sub(r"\nIsi:\n\n(?:\d+\. .*\n)+", "\n", text)
     # Repo-relative links don't resolve in a PDF: keep the name as code.
     text = re.sub(r"\[`?([^\]`]+)`?\]\((?!https?://|#)([^)]+)\)", r"`\1`", text)
     text = text.replace("\n---\n", "\n")
@@ -91,7 +91,7 @@ def split_readme() -> None:
     DOCS_DIR.mkdir(parents=True)
     CHAPTERS.clear()
     (DOCS_DIR / "00-about.md").write_text(intro + "\n", encoding="utf-8")
-    CHAPTERS.append(("00-about.md", "About this guide"))
+    CHAPTERS.append(("00-about.md", "Tentang panduan ini"))
     for i in range(1, len(parts), 3):
         number, title, body = parts[i], parts[i + 1].strip(), parts[i + 2]
         name = f"{int(number):02d}.md"

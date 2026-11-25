@@ -10,7 +10,7 @@ use App\Queries\VisitQuery;
 
 /*
 | Settings for the API iws calls. Everything here comes from .env; you should
-| not need to edit this file. See README.md, "The rules".
+| not need to edit this file. See README.md, section "3. Aturan main".
 */
 
 $list = fn (?string $value): array => array_values(array_filter(array_map('trim', explode(',', (string) $value))));

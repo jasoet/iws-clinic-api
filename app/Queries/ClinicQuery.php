@@ -4,7 +4,7 @@ namespace App\Queries;
 
 /**
  * One record type's query. Your SQL returns one row per record, with a column
- * named after each field in the contract (README.md, "The endpoints").
+ * named after each field in the contract (README.md, bagian "4. Endpoint").
  *
  * Placeholders you can use: :from and :to (the window, as local time in
  * DB_TIMEZONE). Use them as many times as you like. The presence query uses
